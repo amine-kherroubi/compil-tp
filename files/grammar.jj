@@ -1,0 +1,148 @@
+/*
+ * PROBLÈME 05 : JAVACC ET RÉCURSIVITÉ GAUCHE
+ * 
+ * TYPE D'ANALYSE : SYNTAXIQUE (Parser LL avec JavaCC)
+ * 
+ * NOTION THÉORIQUE : Parsers LL et interdiction de la récursivité gauche
+ * 
+ * POURQUOI CE PROBLÈME À L'EXAMEN ?
+ * - JavaCC génère des parsers LL (récursifs descendants)
+ * - Les parsers LL ne peuvent PAS gérer la récursivité gauche
+ * - Comparaison Flex/Bison (LR) vs JavaCC (LL)
+ * - Montre l'importance de l'élimination de récursivité gauche
+ * 
+ * ERREURS CLASSIQUES :
+ * 1. Utiliser récursivité gauche dans JavaCC (erreur à la génération)
+ * 2. Confondre syntaxe JavaCC et Bison
+ * 3. Oublier que JavaCC nécessite grammaire LL(k)
+ * 
+ * DIFFÉRENCES FLEX/BISON vs JAVACC :
+ * - Bison : LR parser (bottom-up) → récursivité gauche OK
+ * - JavaCC : LL parser (top-down) → récursivité gauche INTERDITE
+ */
+
+options {
+    STATIC = false;
+    DEBUG_PARSER = true;
+}
+
+PARSER_BEGIN(ExprParser)
+
+public class ExprParser {
+    public static void main(String[] args) {
+        System.out.println("=== JAVACC : PARSER LL SANS RÉCURSIVITÉ GAUCHE ===\n");
+        System.out.println("IMPORTANT :");
+        System.out.println("- JavaCC génère des parsers LL (récursifs descendants)");
+        System.out.println("- La récursivité GAUCHE est INTERDITE");
+        System.out.println("- Utilisation de la forme transformée (sans récursivité gauche)\n");
+        System.out.println("Grammaire :");
+        System.out.println("  expr  -> term expr'");
+        System.out.println("  expr' -> (+ | -) term expr' | ε");
+        System.out.println("  term  -> NUMBER\n");
+        
+        try {
+            ExprParser parser = new ExprParser(System.in);
+            parser.Start();
+            System.out.println("Parse réussi !");
+        } catch (Exception e) {
+            System.out.println("Erreur : " + e.getMessage());
+        }
+    }
+}
+
+PARSER_END(ExprParser)
+
+/* ANALYSEUR LEXICAL */
+SKIP : { " " | "\t" | "\n" | "\r" }
+
+TOKEN : {
+    < NUMBER: (["0"-"9"])+ >
+    | < PLUS: "+" >
+    | < MINUS: "-" >
+}
+
+/* 
+ * ANALYSEUR SYNTAXIQUE
+ * 
+ * GRAMMAIRE SANS RÉCURSIVITÉ GAUCHE (obligatoire pour JavaCC)
+ * 
+ * Cette grammaire est la version transformée de :
+ *   expr -> expr + term  (récursivité gauche - INTERDITE en JavaCC)
+ *   expr -> expr - term
+ *   expr -> term
+ */
+
+void Start() : {}
+{
+    Expr() <EOF>
+    {
+        System.out.println("Réduction: Start -> Expr");
+    }
+}
+
+/*
+ * expr -> term expr'
+ * 
+ * Commence TOUJOURS par term (non récursif)
+ * Puis appelle expr_prime pour la "queue" de l'expression
+ */
+void Expr() : {}
+{
+    Term() ExprPrime()
+    {
+        System.out.println("Réduction: expr -> term expr'");
+    }
+}
+
+/*
+ * expr' -> + term expr' | - term expr' | ε
+ * 
+ * Récursivité DROITE (autorisée en JavaCC)
+ * Le cas epsilon est géré par le "[ ... ]" (optionnel)
+ */
+void ExprPrime() : {}
+{
+    [
+        ( <PLUS> { System.out.println("Token: +"); }
+        | <MINUS> { System.out.println("Token: -"); }
+        )
+        Term() ExprPrime()
+        {
+            System.out.println("Réduction: expr' -> op term expr'");
+        }
+    ]
+    {
+        /* Si rien n'est matché, c'est le cas epsilon */
+        System.out.println("Réduction: expr' -> ε");
+    }
+}
+
+void Term() : {}
+{
+    <NUMBER>
+    {
+        System.out.println("Réduction: term -> NUMBER [" + token.image + "]");
+    }
+}
+
+/*
+ * COMPARAISON AVEC BISON :
+ * 
+ * BISON (LR - récursivité gauche OK) :
+ *   expr: expr PLUS term
+ *       | expr MINUS term
+ *       | term
+ *       ;
+ * 
+ * JAVACC (LL - récursivité gauche INTERDITE) :
+ *   void Expr() : {}
+ *   { Term() ExprPrime() }
+ *   
+ *   void ExprPrime() : {}
+ *   { [ (PLUS | MINUS) Term() ExprPrime() ] }
+ * 
+ * RAISON :
+ * - Bison construit l'arbre de BAS en HAUT (shift/reduce)
+ * - JavaCC construit l'arbre de HAUT en BAS (récursif descendant)
+ * - Pour JavaCC, récursivité gauche = boucle infinie
+ */

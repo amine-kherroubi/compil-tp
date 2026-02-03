@@ -1,0 +1,93 @@
+/*
+ * PROBLÈME 20 : JAVACC - LANGAGE COMPLET
+ * TYPE D'ANALYSE : SYNTAXIQUE (Parser LL)
+ * NOTION : Langage complet en JavaCC (comparaison avec Bison)
+ */
+
+options {
+    STATIC = false;
+}
+
+PARSER_BEGIN(CompleteParser)
+public class CompleteParser {
+    public static void main(String[] args) {
+        System.out.println("=== JAVACC : LANGAGE COMPLET ===");
+        System.out.println("Parser LL pour mini-langage impératif\n");
+        try {
+            CompleteParser parser = new CompleteParser(System.in);
+            parser.Program();
+            System.out.println("\nProgramme valide");
+        } catch (Exception e) {
+            System.out.println("Erreur: " + e.getMessage());
+        }
+    }
+}
+PARSER_END(CompleteParser)
+
+SKIP : { " " | "\t" | "\n" | "\r" }
+
+TOKEN : {
+    < INT: "int" >
+    | < IF: "if" >
+    | < ELSE: "else" >
+    | < WHILE: "while" >
+    | < RETURN: "return" >
+    | < ID: ["a"-"z"]+ >
+    | < NUM: (["0"-"9"])+ >
+    | < EQ: "==" >
+    | < LT: "<" >
+    | < ASSIGN: "=" >
+    | < PLUS: "+" >
+    | < SEMI: ";" >
+    | < LBRACE: "{" >
+    | < RBRACE: "}" >
+    | < LPAREN: "(" >
+    | < RPAREN: ")" >
+}
+
+void Program() : {}
+{
+    (Statement())* <EOF>
+    { System.out.println("Programme parsé"); }
+}
+
+void Statement() : {}
+{
+    <INT> <ID> <SEMI>
+    { System.out.println("Déclaration"); }
+    |
+    <ID> <ASSIGN> Expression() <SEMI>
+    { System.out.println("Affectation"); }
+    |
+    <IF> <LPAREN> Condition() <RPAREN> Statement() [<ELSE> Statement()]
+    { System.out.println("If statement"); }
+    |
+    <WHILE> <LPAREN> Condition() <RPAREN> Statement()
+    { System.out.println("While loop"); }
+    |
+    <RETURN> Expression() <SEMI>
+    { System.out.println("Return"); }
+    |
+    <LBRACE> (Statement())* <RBRACE>
+    { System.out.println("Block"); }
+}
+
+void Condition() : {}
+{
+    Expression() (<EQ> | <LT>) Expression()
+}
+
+void Expression() : {}
+{
+    Term() ExpressionPrime()
+}
+
+void ExpressionPrime() : {}
+{
+    [<PLUS> Term() ExpressionPrime()]
+}
+
+void Term() : {}
+{
+    <NUM> | <ID>
+}
